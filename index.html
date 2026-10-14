@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="星夜塔羅：每日運勢與三張牌陣，22 張大阿爾克那，純前端單一網頁。">
+<title>星夜塔羅</title>
+<style>
+:root{
+  --bg1:#0b0a1f;--bg2:#1a1240;--bg3:#2b1b5a;
+  --gold:#d4af37;--gold-l:#f3e2a0;--text:#efe9ff;--purple:#7a5cff;
+  --card1:#14103a;--card2:#241a55;
+  --serif:"Noto Serif TC","Songti TC","PMingLiU","Times New Roman",serif;
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;color:var(--text);font-family:var(--serif);line-height:1.75;
+  background:linear-gradient(180deg,#0b0a1f 0%,#1a1240 55%,#2b1b5a 100%) fixed;background-color:#1a1240}
+button{font-family:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.5}
+:focus-visible{outline:2px solid var(--gold-l);outline-offset:3px}
+
+#stars{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.star{position:absolute;background:#fff;border-radius:50%;opacity:.5;animation:twinkle var(--dur,4s) ease-in-out var(--del,0s) infinite}
+@keyframes twinkle{0%,100%{opacity:.12}50%{opacity:.95}}
+
+.wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:26px 20px 56px}
+header{text-align:center;margin-bottom:18px}
+h1{margin:0;font-size:2.4rem;letter-spacing:.35em;margin-right:-.35em;color:var(--gold-l);text-shadow:0 0 18px rgba(212,175,55,.5)}
+.sub{margin:6px 0 0;color:#cbbff0;letter-spacing:.2em;font-size:.95rem}
+
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:24px}
+@media(min-width:1100px){.layout{grid-template-columns:minmax(0,1fr) 310px;align-items:start}}
+
+.panel{border:1px solid rgba(212,175,55,.35);border-radius:16px;background:rgba(20,16,58,.6);
+  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);padding:16px 18px}
+.setup{display:flex;flex-wrap:wrap;gap:14px 26px;align-items:center;justify-content:center}
+.group{display:flex;align-items:center;gap:10px}
+.glabel{color:var(--gold);letter-spacing:.2em;font-size:.9rem}
+.seg{display:inline-flex;border:1px solid rgba(212,175,55,.5);border-radius:999px;overflow:hidden}
+.seg button{background:transparent;color:var(--text);border:0;padding:7px 16px;font-size:.95rem;letter-spacing:.1em;transition:background .25s,color .25s}
+.seg button[aria-checked="true"]{background:var(--gold);color:#1a1240;font-weight:700}
+.seg button:not([aria-checked="true"]):hover:not(:disabled){background:rgba(212,175,55,.18)}
+.primary{background:linear-gradient(180deg,#f3e2a0,#d4af37);color:#1a1240;border:0;border-radius:999px;padding:9px 26px;
+  font-size:1.05rem;font-weight:700;letter-spacing:.25em;box-shadow:0 0 18px rgba(212,175,55,.35);transition:transform .2s,box-shadow .2s}
+.primary:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 0 26px rgba(243,226,160,.6)}
+
+.status{text-align:center;margin:14px 0 4px;color:var(--gold-l);letter-spacing:.12em;min-height:1.75em}
+.stage{margin-top:6px}
+
+/* 牌位 */
+.slots{--cw:148px;--ch:calc(var(--cw)*1.5);display:flex;justify-content:center;gap:34px;flex-wrap:wrap}
+.slots.daily{--cw:176px}
+.slot{width:calc(var(--cw) + 12px);text-align:center}
+.slot .label{color:var(--gold-l);letter-spacing:.25em;margin-bottom:8px;font-size:.95rem}
+.slotbox{position:relative;width:var(--cw);height:var(--ch);margin:0 auto;border:1px dashed rgba(212,175,55,.5);border-radius:12px;background:rgba(255,255,255,.03)}
+
+/* 牌的 3D 翻轉 */
+.card3d{position:absolute;inset:0;z-index:6;perspective:900px}
+.card-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .85s cubic-bezier(.3,.7,.2,1)}
+.card3d.flipped .card-inner{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;border-radius:12px;border:2px solid var(--gold);overflow:hidden;
+  backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.face.back,.dcard{background:radial-gradient(circle at 50% 40%,#3a2a82,#16113f 70%)}
+.face.back svg,.dcard svg{width:100%;height:100%;display:block}
+.face.front{transform:rotateY(180deg);display:flex;flex-direction:column;align-items:center;padding:.55em .5em .8em;
+  font-size:calc(var(--cw)*.1);background:linear-gradient(160deg,var(--card1),var(--card2));
+  box-shadow:inset 0 0 0 .25em var(--card1),inset 0 0 0 calc(.25em + 1px) rgba(212,175,55,.6)}
+.roman{color:var(--gold);letter-spacing:.2em;margin-right:-.2em;font-size:1em;margin-top:.2em}
+.icon{flex:1;min-height:0;width:78%;color:var(--gold);margin:.2em 0}
+.icon svg{width:100%;height:100%;display:block}
+.card3d.rev .icon{transform:rotate(180deg)}
+.cname{color:var(--gold-l);font-size:1.25em;letter-spacing:.3em;margin-right:-.3em;white-space:nowrap}
+.rtag{position:absolute;top:.5em;right:.5em;font-size:.7em;padding:0 .55em;border:1px solid var(--gold);border-radius:999px;background:rgba(122,92,255,.45);color:var(--gold-l)}
+.face.front::before,.face.front::after{content:"✦";position:absolute;bottom:.55em;color:var(--gold);font-size:.8em}
+.face.front::before{left:.7em}
+.face.front::after{right:.7em}
+.card3d.flipped .face.front{animation:glow 1.6s ease-out forwards}
+@keyframes glow{
+  0%{box-shadow:inset 0 0 0 .25em var(--card1),inset 0 0 0 calc(.25em + 1px) rgba(212,175,55,.6),0 0 0 rgba(243,226,160,0)}
+  45%{box-shadow:inset 0 0 0 .25em var(--card1),inset 0 0 0 calc(.25em + 1px) rgba(212,175,55,.6),0 0 40px rgba(243,226,160,.8)}
+  100%{box-shadow:inset 0 0 0 .25em var(--card1),inset 0 0 0 calc(.25em + 1px) rgba(212,175,55,.6),0 0 16px rgba(243,226,160,.3)}
+}
+
+/* 牌堆：疊牌 → 洗牌 → 扇形 */
+.deckarea{position:relative;height:160px;margin:12px auto 0;max-width:780px;transition:height .7s ease,opacity .5s ease,margin .5s ease}
+.deckarea.fan{height:330px}
+.deckarea.collapsed{height:0;opacity:0;overflow:hidden;pointer-events:none;margin-top:0;padding:0}
+.dcard{position:absolute;left:50%;top:0;width:84px;height:126px;margin-left:-42px;padding:0;border:2px solid var(--gold);border-radius:8px;overflow:hidden;
+  transform-origin:50% 380px;transform:translate(calc(var(--i)*.35px),calc(var(--i)*-.35px));
+  transition:transform .7s cubic-bezier(.2,.8,.2,1) calc(var(--i)*14ms),opacity .4s,filter .3s,box-shadow .3s;cursor:default}
+.deckarea.settled .dcard{transition:transform .18s ease,opacity .4s,filter .3s,box-shadow .3s}
+.deckarea.fan .dcard{transform:rotate(var(--a));cursor:pointer}
+.deckarea.settled.fan .dcard:not(.picked):hover,
+.deckarea.fan .dcard:not(.picked):focus-visible{transform:rotate(var(--a)) translateY(-18px);box-shadow:0 0 18px rgba(243,226,160,.7);z-index:3}
+.deckarea.shuffling .dcard{animation:shuf .5s ease-in-out calc(var(--i)*18ms) 4}
+@keyframes shuf{
+  0%,100%{transform:translate(calc(var(--i)*.35px),calc(var(--i)*-.35px))}
+  50%{transform:translate(calc(var(--d)*80px),calc(var(--i)*-.35px)) rotate(calc(var(--d)*5deg))}
+}
+.deckarea.single .dcard:not(:first-child){opacity:0;pointer-events:none}
+.deckarea.single .dcard:first-child{cursor:pointer;animation:pulse 1.8s ease-in-out infinite}
+.deckarea.single .dcard:first-child:hover{transform:translateY(-6px)}
+@keyframes pulse{0%,100%{box-shadow:0 0 6px rgba(243,226,160,.35)}50%{box-shadow:0 0 24px rgba(243,226,160,.9)}}
+.dcard.picked{opacity:.22;filter:grayscale(.7);pointer-events:none}
+
+/* 解讀 */
+.reading{margin-top:22px;padding:22px 24px;animation:fadein .9s ease both}
+@keyframes fadein{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.rhead{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+.rhead h2{margin:0;font-size:1.2rem;color:var(--gold-l);letter-spacing:.2em}
+.rgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.rgrid.one{grid-template-columns:minmax(0,640px);justify-content:center}
+.rcard{border:1px solid rgba(212,175,55,.3);border-radius:12px;padding:14px 16px;background:rgba(11,10,31,.45)}
+.rcard .pos{color:var(--gold);letter-spacing:.25em;font-size:.9rem;margin:0}
+.rcard h3{margin:2px 0 4px;font-size:1.35rem;color:var(--gold-l);letter-spacing:.2em;font-weight:700}
+.ori{font-size:.8rem;border:1px solid var(--gold);border-radius:999px;padding:0 8px;margin-left:10px;letter-spacing:.1em;vertical-align:middle;font-weight:400}
+.ori.r{background:rgba(122,92,255,.4)}
+.kw{color:#cbbff0;margin:0 0 8px;font-size:.95rem}
+.posintro{color:#b9aee0;font-size:.9rem;margin:0 0 6px}
+.txt{margin:0}
+.summary{margin:18px 0 0;padding-top:14px;border-top:1px solid rgba(212,175,55,.3);text-align:center;color:var(--gold-l)}
+
+/* 紀錄 */
+.history h2{margin:0 0 6px;font-size:1.15rem;color:var(--gold-l);letter-spacing:.2em}
+.muted{color:#b9aee0;font-size:.85rem;margin:0 0 10px}
+#histList{list-style:none;margin:0 0 12px;padding:0;max-height:520px;overflow:auto}
+#histList li{border-bottom:1px solid rgba(212,175,55,.2)}
+#histList summary{cursor:pointer;padding:8px 0;font-size:.92rem;list-style:none}
+#histList summary::-webkit-details-marker{display:none}
+#histList .ht{display:block;color:#b9aee0;font-size:.8rem}
+#histList .ht::before{content:"▸ ";color:var(--gold)}
+#histList details[open] .ht::before{content:"▾ "}
+.hdetail{padding:0 0 10px 6px;font-size:.88rem}
+.hdetail p{margin:0 0 6px}
+.ghost{background:transparent;color:var(--gold-l);border:1px solid rgba(212,175,55,.6);border-radius:999px;padding:5px 16px;font-size:.88rem;letter-spacing:.1em}
+.ghost:hover:not(:disabled){background:rgba(212,175,55,.18)}
+
+.disclaimer{margin-top:30px;text-align:center;color:#a99fd0;font-size:.85rem;letter-spacing:.08em}
+.sr{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+
+/* 窄螢幕：扇形改為橫向捲動 */
+@media(max-width:767px){
+  h1{font-size:1.8rem}
+  .setup{gap:12px 16px;padding:14px 10px}
+  .glabel{white-space:nowrap}
+  .seg{flex-shrink:0}
+  .seg button{padding:7px 12px;white-space:nowrap}
+  .wrap{padding:20px 14px 44px}
+  .slots{--cw:88px;gap:10px}
+  .slots.daily{--cw:140px}
+  .deckarea.fan{display:flex;overflow-x:auto;gap:8px;height:auto;padding:16px 10px 12px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+  .deckarea.fan.collapsed{height:0;padding:0}
+  .deckarea.fan .dcard{position:relative;left:auto;top:auto;margin:0;flex:0 0 64px;width:64px;height:96px;transform:none;scroll-snap-align:center}
+  .deckarea.settled.fan .dcard:not(.picked):hover,
+  .deckarea.fan .dcard:not(.picked):focus-visible{transform:translateY(-6px)}
+  .rgrid{grid-template-columns:minmax(0,1fr)}
+  .reading{padding:18px 14px}
+}
+
+/* 減少動態效果 */
+@media(prefers-reduced-motion:reduce){
+  .star{animation:none}
+  .card-inner{transition:none}
+  .card3d.flipped .card-inner{transform:none}
+  .face{backface-visibility:visible;-webkit-backface-visibility:visible}
+  .face.front{transform:none;opacity:0;transition:opacity .5s}
+  .card3d.flipped .face.front{opacity:1;animation:none}
+  .face.back{transition:opacity .5s}
+  .card3d.flipped .face.back{opacity:0}
+  .deckarea.single .dcard:first-child{animation:none}
+  .dcard{transition:none!important}
+  .deckarea{transition:none}
+  .reading{animation:none}
+}
+</style>
+</head>
+<body>
+<div id="stars" aria-hidden="true"></div>
+<div class="wrap">
+  <header>
+    <h1>星夜塔羅</h1>
+    <p class="sub">Starry Night Tarot ・ 讓星辰為你低語</p>
+  </header>
+
+  <div class="layout">
+    <main>
+      <section class="panel setup" aria-label="抽牌設定">
+        <div class="group">
+          <span class="glabel">模式</span>
+          <div class="seg" id="modeSeg" role="radiogroup" aria-label="抽牌模式">
+            <button type="button" role="radio" data-mode="daily" aria-checked="true">每日運勢</button>
+            <button type="button" role="radio" data-mode="three" aria-checked="false">三張牌陣</button>
+          </div>
+        </div>
+        <div class="group">
+          <span class="glabel">類別</span>
+          <div class="seg cat-tabs" role="radiogroup" aria-label="問題類別"></div>
+        </div>
+        <button type="button" id="startBtn" class="primary">開始洗牌</button>
+      </section>
+
+      <p id="status" class="status"></p>
+
+      <section class="stage">
+        <div id="slots" class="slots"></div>
+        <div id="deckArea" class="deckarea" role="group" aria-label="牌堆"></div>
+        <section id="reading" class="panel reading" hidden aria-label="牌義解讀">
+          <div class="rhead">
+            <h2 id="readTitle"></h2>
+            <div class="seg cat-tabs" role="radiogroup" aria-label="切換解讀類別"></div>
+          </div>
+          <div id="readBody"></div>
+          <p id="summary" class="summary" hidden></p>
+        </section>
+      </section>
+    </main>
+
+    <aside class="panel history" aria-label="抽牌紀錄">
+      <h2>抽牌紀錄</h2>
+      <p class="muted" id="histNote"></p>
+      <ol id="histList"></ol>
+      <button type="button" id="clearBtn" class="ghost">清除紀錄</button>
+    </aside>
+  </div>
+
+  <footer class="disclaimer">本作品僅供娛樂與自我反思，不構成任何預測或建議。</footer>
+</div>
+<div id="sr" class="sr" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ========== 繪圖小工具 ========== */
+const P=d=>`<path d="${d}"/>`;
+const C=(x,y,r)=>`<circle cx="${x}" cy="${y}" r="${r}"/>`;
+const E=(x,y,rx,ry)=>`<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}"/>`;
+const L=(x1,y1,x2,y2)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+const R=(x,y,w,h,rx)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx||0}"/>`;
+const PG=pts=>`<polygon points="${pts}"/>`;
+const f1=n=>n.toFixed(1);
+function starPts(cx,cy,Ro,Ri,n,rot){
+  rot=(rot===undefined)?-90:rot;const s=[];
+  for(let i=0;i<n*2;i++){const r=i%2?Ri:Ro;const a=(rot+i*180/n)*Math.PI/180;s.push(f1(cx+r*Math.cos(a))+','+f1(cy+r*Math.sin(a)))}
+  return s.join(' ');
+}
+function rayLines(cx,cy,r1,r2,angs){
+  return angs.map(a=>{const t=a*Math.PI/180;return L(f1(cx+r1*Math.cos(t)),f1(cy+r1*Math.sin(t)),f1(cx+r2*Math.cos(t)),f1(cy+r2*Math.sin(t)))}).join('');
+}
+const range=(a,b,s)=>{const o=[];for(let x=a;x<=b;x+=s)o.push(x);return o};
+const LEM='M50 50C40 34 14 34 14 50C14 66 40 66 50 50C60 34 86 34 86 50C86 66 60 66 50 50';
+const HEART='M50 78C20 56 22 30 40 30C47 30 50 36 50 40C50 36 53 30 60 30C78 30 80 56 50 78Z';
+const key=x=>C(x,26,9)+L(x,35,x,90)+L(x,70,x+10,70)+L(x,82,x+8,82);
+const dog=x=>C(x,80,9)+PG(`${x-8},74 ${x-6},62 ${x},71`)+PG(`${x+8},74 ${x+6},62 ${x},71`);
+const pv=k=>{const a=(90+72*k)*Math.PI/180;return f1(50+28*Math.cos(a))+' '+f1(46+28*Math.sin(a))};
+
+/* 22 張牌的簡化線條圖案（統一 100x100 格子、金色線條） */
+const ICONS=[
+/*0 愚者*/ ()=>C(72,26,9)+P('M22 66a8 8 0 0 1 0-16a12 12 0 0 1 23-3a9 9 0 0 1 15 6a7 7 0 0 1-2 13z')+P('M14 92Q50 70 86 92'),
+/*1 魔術師*/ ()=>L(50,6,50,20)+`<g transform="translate(0 -14)">${P(LEM)}</g>`+C(22,78,6)+R(35,72,12,12)+PG('60,71 66,84 54,84')+PG('79,70 86,78 79,86 72,78'),
+/*2 女祭司*/ ()=>R(10,14,12,76)+R(78,14,12,76)+P('M50 28A22 22 0 1 0 50 72A30 30 0 0 1 50 28Z'),
+/*3 皇后*/ ()=>C(50,38,15)+L(50,53,50,84)+L(38,70,62,70)+P('M18 90Q14 66 24 50')+P('M82 90Q86 66 76 50')+C(24,46,3)+C(76,46,3),
+/*4 皇帝*/ ()=>C(50,12,6)+L(50,18,50,34)+R(24,34,52,54)+L(24,62,76,62)+L(38,48,62,48),
+/*5 教皇*/ ()=>key(32)+key(68),
+/*6 戀人*/ ()=>P('M28 20Q50 4 72 20')+`<g transform="translate(-6 14) scale(.8)">${P(HEART)}</g><g transform="translate(26 4) scale(.8)">${P(HEART)}</g>`,
+/*7 戰車*/ ()=>PG(starPts(50,22,14,6,5))+R(22,46,56,14,3)+C(32,76,13)+C(68,76,13)+L(32,63,32,89)+L(19,76,45,76)+L(68,63,68,89)+L(55,76,81,76),
+/*8 力量*/ ()=>`<g transform="translate(25 2) scale(.5)">${P(LEM)}</g>`+PG(starPts(50,66,28,22,12))+C(50,66,16)+C(43,62,1.6)+C(57,62,1.6)+PG('50,68 46,74 54,74'),
+/*9 隱者*/ ()=>L(50,6,50,12)+R(42,12,16,20,3)+C(50,22,3.5)+L(36,22,30,18)+L(64,22,70,18)+P('M6 92L34 52L50 74L68 46L94 92Z'),
+/*10 命運之輪*/ ()=>C(50,50,34)+C(50,50,8)+C(50,50,43)+rayLines(50,50,8,34,range(0,315,45)),
+/*11 正義*/ ()=>C(50,9,3.5)+L(50,12,50,90)+L(22,28,78,28)+L(22,28,12,52)+L(22,28,32,52)+L(78,28,68,52)+L(78,28,88,52)+P('M10 52Q22 66 34 52Z')+P('M66 52Q78 66 90 52Z')+L(40,78,60,78),
+/*12 倒吊人*/ ()=>L(20,12,80,12)+L(50,12,50,34)+L(50,34,50,68)+C(50,78,9)+C(50,78,15)+L(50,50,34,62)+L(50,50,66,62)+L(50,34,42,46)+L(50,34,58,46),
+/*13 死神*/ ()=>L(8,70,92,70)+P('M28 70A22 22 0 0 1 72 70')+rayLines(50,70,28,38,[210,240,270,300,330])+C(50,86,6)+C(50,86,2.5),
+/*14 節制*/ ()=>PG('14,26 42,26 36,50 20,50')+L(28,50,28,60)+L(22,60,34,60)+PG('58,50 86,50 80,74 64,74')+L(72,74,72,84)+L(66,84,78,84)+P('M44 30Q60 30 62 48'),
+/*15 惡魔*/ ()=>C(50,46,32)+P('M'+[0,2,4,1,3].map(pv).join('L')+'Z')+E(36,90,8,4)+E(50,90,8,4)+E(64,90,8,4),
+/*16 高塔*/ ()=>R(36,36,28,54)+PG('32,36 68,36 50,16')+R(46,52,8,12)+L(28,90,72,90)+P('M86 6L72 30H82L68 54'),
+/*17 星星*/ ()=>PG(starPts(50,40,24,9,8))+[[14,16],[86,16],[12,58],[88,58],[26,88],[74,88],[50,92]].map(p=>C(p[0],p[1],2.6)).join(''),
+/*18 月亮*/ ()=>P('M54 8A24 24 0 1 0 54 54A30 30 0 0 1 54 8Z')+dog(26)+dog(74)+P('M50 96Q42 84 50 72Q58 64 50 58'),
+/*19 太陽*/ ()=>C(50,50,15)+C(50,50,8)+rayLines(50,50,22,36,range(0,330,30)),
+/*20 審判*/ ()=>P('M16 52L64 30L64 74L16 60Z')+C(11,56,4)+P('M72 42Q82 52 72 62')+P('M80 34Q96 52 80 70')+P('M10 90Q22 80 34 90Q46 80 58 90Q70 80 82 90'),
+/*21 世界*/ ()=>E(50,50,28,38)+range(0,337.5,22.5).map(a=>{const t=a*Math.PI/180;return C(f1(50+34*Math.cos(t)),f1(50+42*Math.sin(t)),2.6)}).join('')+C(10,10,4)+C(90,10,4)+C(10,90,4)+C(90,90,4)+PG(starPts(50,50,12,5,5))
+];
+
+const BACK=`<svg viewBox="0 0 84 126" fill="none" stroke="#d4af37" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">`+
+  `<rect x="5" y="5" width="74" height="116" rx="5"/><rect x="9" y="9" width="66" height="108" rx="3" stroke-opacity=".5"/>`+
+  `<circle cx="42" cy="63" r="27"/><circle cx="42" cy="63" r="20" stroke-opacity=".6"/>`+
+  `<polygon points="${starPts(42,63,25,9,8)}"/><polygon points="${starPts(42,63,15,6,4,0)}"/>`+
+  [[16,18],[68,18],[16,108],[68,108]].map(p=>`<polygon points="${starPts(p[0],p[1],5,2,4)}"/>`).join('')+`</svg>`;
+
+/* ========== 牌組資料：22 張大阿爾克那 ========== */
+// u / v：正位 / 逆位關鍵字；up / rv：正位 / 逆位解讀，順序為 [綜合, 愛情, 學業, 事業]
+const CARDS=[
+{r:'0',name:'愚者',u:['新的開始','自由'],v:['輕率冒進','遲疑不前'],
+ up:['新程初啟，輕裝簡行。心懷好奇而不執於結果，腳下的路自會一步步展開，風亦願為行者引路。',
+     '情緣如初見之晨，不必預設結局。以坦然與好奇相待，真誠本身便是最美的開場。',
+     '學海無涯，宜以初學者之心入門。不懼提問、不畏嘗試，新領域的門扉正為好奇者敞開。',
+     '新的方向或機會在遠處微光閃動。先踏出第一步，邊走邊修正，勝過久久佇立於原地。'],
+ rv:['步履過急，或在岔路口久久遲疑。此刻宜略停片刻，看清腳下的懸崖與前方的路，再作決定。',
+     '情感中或有衝動的言行，或有遲遲不敢邁出的心。願多一分思量，也多一分勇氣，兩者相濟。',
+     '計畫尚未成形便匆匆起跑，或因畏懼而止步不前。先理出方向與步驟，行動方有著力之處。',
+     '機會當前，須防未經評估的冒進，亦勿因猶疑而錯失時機。列出風險與底線，再放膽前行。']},
+{r:'I',name:'魔術師',u:['創造','行動力'],v:['才能蟄伏','言過其實'],
+ up:['備有四元之器，天賦與資源俱在。專注心意、化念為行，所思所想皆可凝成實形。',
+     '以真誠的言語與行動傳遞心意，關係便有生機。主動創造相處的契機，勝過等待緣分降臨。',
+     '方法與工具齊備，宜將所學付諸實作。整合分散的知識，親手做出成果，理解自然深刻。',
+     '能力與資源皆可調度，是展現專長、推動計畫的時機。目標清楚，行動便具力量。'],
+ rv:['才能暫時蟄伏，或心意散而不聚。宜重新盤點手中資源，並留意言辭是否言過其實。',
+     '表達或有誇飾，心意未能如實傳達。放下包裝、坦誠相對，信任才有紮根的土壤。',
+     '工具琳瑯卻難以專注，努力散落多處。收攏目標、擇一深入，比涉獵過廣更有收穫。',
+     '構想雖多，執行尚缺一環；承諾或略超出能力。回到可驗證的步驟，讓實績替自己說話。']},
+{r:'II',name:'女祭司',u:['直覺','內在智慧'],v:['忽略直覺','有所保留'],
+ up:['帷幕之後藏有未言之智。安靜片刻，傾聽內在的聲音，直覺所指往往比喧嘩的意見更接近真相。',
+     '情感深處有細微的訊息，不必急於說破。以耐心與體察相待，沉默亦可是溫柔的回應。',
+     '宜靜心研讀、細細領會，而非趕路求快。留一段獨處的時光，讓知識在心中沉澱成理解。',
+     '局勢中尚有未明之處，宜多觀察、少表態。蒐集資訊、默默累積，待時機成熟再行動。'],
+ rv:['內在之聲被喧囂掩蓋，或有所保留而未明言。為自己留一方清靜，重新聽見真正的想法。',
+     '心事藏得太深，或對彼此的感受視而不見。試著說出一件真實的心情，讓流動重新開始。',
+     '資訊紛雜，易迷失於他人的見解。暫時關掉雜音，回到自己的問題與筆記，答案漸次浮現。',
+     '重要訊息未被留意，或有人事未攤開來說。多一次確認與詢問，能避開日後的誤會。']},
+{r:'III',name:'皇后',u:['豐盛','滋養'],v:['過度付出','暫時停滯'],
+ up:['大地豐饒，萬物滋長。以溫柔與耐心栽培所愛之事，付出的心力如麥穗般，在時光中結實。',
+     '關係如花園，宜以關懷與陪伴灌溉。感官與情意皆受滋養，是柔軟而豐盛的相處時節。',
+     '播下的種子漸漸發芽。保持規律與耐心，也別忘了照顧身心，良好的狀態是學習的沃土。',
+     '創意與成果有機會自然生長。以關懷經營團隊與作品，穩定而持續的投入帶來豐收。'],
+ rv:['付出或失了節制，或過度倚賴外在的滋養。回頭照顧自己，讓能量重新充盈後再給予。',
+     '關懷若轉為過度掌握或依賴，反成負擔。給彼此一些空間，愛才能在自由中呼吸。',
+     '學習陷入停滯，或因舒適而怠於前行。為自己設下小小的進度，慢慢重啟成長的節奏。',
+     '工作產出略顯遲滯，或在人際付出上耗損過多。劃清界線、整理優先順序，再度聚焦。']},
+{r:'IV',name:'皇帝',u:['秩序','責任'],v:['過度掌控','僵化'],
+ up:['秩序是疆土的根基。以清晰的規則與責任感為路，穩定的結構能讓人從容地走得更遠。',
+     '關係需要承諾與可靠的肩膀。清楚表達界線與期待，安穩的態度本身便是一種深情。',
+     '宜建立嚴謹的計畫與作息，依序推進。紀律帶來的並非束縛，而是穩穩前行的力量。',
+     '適合制定制度、承擔責任、做出決斷。以結構與數據支撐判斷，權威來自可信賴的作為。'],
+ rv:['堅持或轉為過度掌控，規矩變得僵硬。稍微放鬆手中的韁繩，容納彈性與他人的意見。',
+     '掌控的心若過重，容易讓對方窒息。傾聽比定奪更重要，讓關係有商量的餘地。',
+     '計畫排得過滿而難以呼吸，或全然失序。調整為可持續的節奏，保留彈性方能長久。',
+     '管理方式或過於剛硬，或缺乏明確的規劃。重新檢視制度的目的，讓規則服務人，而非相反。']},
+{r:'V',name:'教皇',u:['傳統','指引'],v:['重新檢視信念','盲從'],
+ up:['傳統與智慧如燈，指引前行之路。向可信的師長或經驗請益，循著既有的脈絡，更易行得穩當。',
+     '重視共同的價值與承諾，在穩定的框架中培養信任。長久的關係，往往由共同遵守的默契築成。',
+     '適合跟隨系統化的課程與良師。先扎實掌握基礎，再談創新，根基穩固方能高築。',
+     '組織規範與前輩經驗可為依靠。遵循正式的流程與準則，透過師徒或團隊傳承累積信譽。'],
+ rv:['舊有的規條或許已不合用，或只是盲從他人的聲音。檢視哪些信念仍真實屬於自己，再作取捨。',
+     '關係被世俗期待所左右，真實的心意被擱置。誠實面對自己想要的樣子，再與對方商量。',
+     '死記教條、缺乏思辨，或遇到不合適的方法。嘗試以自己的方式提問與整理，找出適配的路徑。',
+     '流程或慣例可能已成束縛。在不違反原則的前提下，試著提出改良，並多聽不同的聲音。']},
+{r:'VI',name:'戀人',u:['抉擇','和諧'],v:['搖擺不定','失衡'],
+ up:['兩條道路在前，心之所向便是答案。依循真實的價值作選擇，和諧與連結隨之而來。',
+     '心意相通、彼此欣賞的時節。真誠地表達喜愛與承諾，感情在平等的對望中綻放。',
+     '面臨選科、選題或方向時，宜追隨真正的興趣與價值。與志同道合者切磋，更能相互啟發。',
+     '合作與抉擇並至。選擇與自身價值一致的方向與夥伴，和諧的關係為成果加分。'],
+ rv:['天秤略有傾斜，選擇之際心念搖擺。釐清自己真正看重的事物，不為他人的期待而倉促決定。',
+     '關係中或有不對等的付出，或心中仍在猶疑。坦率地談談各自的需要，重新找回平衡。',
+     '興趣與現實之間拉扯，難以專心。將選項列出比較，並設定期限，避免久久懸而未決。',
+     '團隊或決策中出現價值分歧。先釐清共同目標，再協商取捨，避免因搖擺而耽誤進度。']},
+{r:'VII',name:'戰車',u:['意志','勝利'],v:['難以駕馭','方向不明'],
+ up:['意志如韁繩，執於一手，雙駒便能朝同一方向奔馳。目標明確、自律前行，勝利屬於有方向的人。',
+     '以積極而有分寸的態度靠近所愛。在熱情與理性之間取得平衡，主動爭取便有回應。',
+     '衝刺的好時機。訂下明確的目標與進度，專注而持續地推進，成績便會向前挪動。',
+     '專案有望快速推進，宜果斷行動、掌握節奏。清楚的方向加上堅定的執行，易取得突破。'],
+ rv:['力量四散，雙駒各奔東西。暫停衝刺，重新確認方向與節奏，駕馭得宜才能走得長遠。',
+     '情緒或步調不一致，難以駕馭。放慢腳步，先釐清各自的方向，勿以競爭取代溝通。',
+     '進度壓力使心浮氣躁，或目標模糊。回到最重要的一件事，穩住節奏，比盲目衝刺更有效。',
+     '方向不明或資源分散，推進受阻。重新排序優先事項、統一步調，再度整隊出發。']},
+{r:'VIII',name:'力量',u:['勇氣','柔韌'],v:['自我懷疑','情緒起伏'],
+ up:['真正的力量是柔韌而非強硬。以耐心與溫柔馴服內在的獅，勇氣便在平靜之中悄然生長。',
+     '以包容與溫柔面對關係中的起伏。克制衝動的言辭，穩定而溫暖的心，最能讓對方安心。',
+     '面對困難的科目，需要的是堅持與自我鼓勵。一步一步攻克，每次不放棄都是力量的累積。',
+     '以沉穩的態度處理壓力與衝突。保持耐心與信心，柔中帶剛的處事風格贏得信賴。'],
+ rv:['自信略有動搖，或情緒暫時難以安撫。允許自己疲倦，並以溫柔的方式重新積累勇氣。',
+     '自我懷疑或情緒起伏影響相處。先好好安撫自己的心，再誠實地表達，不必逞強。',
+     '挫折使信心受損，或因衝動而半途改弦。把目標切小，累積小小的成功，信心便慢慢回來。',
+     '壓力之下易生衝動或怯步。深呼吸、尋求支持，以穩定的節奏取代一時的逞強。']},
+{r:'IX',name:'隱者',u:['沉澱','尋找答案'],v:['獨處過久','與外界疏離'],
+ up:['提燈走入山中，向內探尋答案。暫時退出喧囂，獨處與沉澱能讓人看清自己真正在乎的方向。',
+     '需要一段安靜的時光整理心緒。誠實面對自己對關係的期待，再以清明的心去靠近他人。',
+     '適合專注研究與深度思考。尋一處清靜之所，沉潛下來鑽研，往往能獲得獨到的洞見。',
+     '暫時遠離紛擾，專注於核心工作或自我反思。以經驗與思考為燈，找出長遠的方向。'],
+ rv:['獨處或許過久，與外界漸漸疏離。不妨讓光透進來，向信任的人分享所思所想。',
+     '封閉自己或逃避相處。試著邁出一小步，與對方分享心中的一個念頭，讓距離慢慢收攏。',
+     '閉門造車而缺乏回饋。找師友交流或請教，讓獨自累積的想法接受外界的檢驗。',
+     '過度沉浸於獨自作業，與團隊失去連結。主動同步進度，讓努力被看見，也聽見他人的建議。']},
+{r:'X',name:'命運之輪',u:['轉機','循環'],v:['輪轉滯澀','抗拒變動'],
+ up:['輪轉不息，高低有時。變動中蘊藏轉機，順勢而為並把握契機，時運便在循環裡向上推進。',
+     '緣分的流轉帶來新的機會或轉折。以開放的心接納變化，相遇與重逢都可能悄悄發生。',
+     '學習的節奏迎來轉折，或遇到合適的機會。保持彈性、把握契機，努力在轉動中顯現成果。',
+     '局勢出現新的變化，帶來轉機或新職責。留意時機的窗口，適時調整方向，順勢而上。'],
+ rv:['輪轉略顯滯澀，變動令人想抗拒。接受有起必有落，專注於自己能掌握的部分，耐心待轉。',
+     '關係的節奏似乎卡住，或抗拒改變。不必強求，先照顧好自己的心，時機到了自然流動。',
+     '進度遇到阻滯，成績起伏不定。回顧方法並微調，不因一時波動而否定整體的努力。',
+     '計畫延遲或環境變動令人不安。準備備案、保持彈性，把握不變的原則度過週期。']},
+{r:'XI',name:'正義',u:['公正','因果'],v:['失之偏頗','待承擔'],
+ up:['天秤端平，劍鋒明辨。誠實面對事實與選擇，行事公正，因果自會給出合理的回應。',
+     '以坦率與公平的態度對待彼此。清楚說明各自的立場與責任，平等的關係才經得起時光。',
+     '認真與成績成正比的時節。以公正的標準檢視自己的努力，扎實的準備終有相應的回饋。',
+     '契約、評核或決策宜重視公平與證據。依規範行事、保持透明，誠信便是最好的資產。'],
+ rv:['天秤略傾，或有偏頗的判斷與未面對的責任。重新檢視事實，勇於承擔自己的那一份。',
+     '彼此的付出或有失衡，或存在未說開的心結。以公平的角度重新對話，避免只看一面之詞。',
+     '評量結果不如預期，或對自己的要求失當。冷靜檢討原因，而非一味自責或歸咎他人。',
+     '資訊不夠透明或判斷失之偏頗。補齊事實與文件，必要時尋求第三方意見，維護公平。']},
+{r:'XII',name:'倒吊人',u:['換個角度','犧牲'],v:['原地停滯','固守己見'],
+ up:['倒懸之際，世界換了一種模樣。暫停、放下與換個角度，看似停滯的時刻，往往孕育新的洞見。',
+     '以對方的視角看待事情，願意為關係暫時退讓。耐心等待，沉澱之後便有新的理解。',
+     '遇到瓶頸時，不妨換一種方式學習，或暫停片刻。換個切入點，原本糾結之處便豁然開朗。',
+     '進度雖緩，卻是重新思考策略的機會。暫緩一步、轉換視角，為更長遠的成果蓄力。'],
+ rv:['長久擱置而毫無動靜，或固執於原來的角度。是時候做出取捨，讓停滯的事重新流動。',
+     '一味付出而得不到回應，或堅持己見使關係僵持。想清楚自己的底線，再決定去留與調整。',
+     '長時間原地踏步，努力卻不見進展。檢視方法是否有誤，勇敢放下無效的做法。',
+     '在無效的事上耗費心力，或拖延重要決定。評估投入與回報，果斷轉向更值得的方向。']},
+{r:'XIII',name:'死神',u:['結束與重生','轉化'],v:['難以放手','延遲轉化'],
+ up:['舊的告別，新的啟程。結束並非終點，而是為更合適的形態騰出空間，破曉之後自有重生。',
+     '一段模式或關係走到轉折。誠實地告別不再適合的部分，感情方能以新的樣貌延續或展開。',
+     '舊的學習方式或階段告一段落。放下過去的習慣與包袱，迎接新的方法與目標。',
+     '某個專案、角色或做法走向完結。把握結束的契機，整理經驗，為下一階段打好基礎。'],
+ rv:['難以放手，使變化遲遲未能完成。承認某些事已走到盡頭，轉化的過程雖不捨，卻是必要。',
+     '對已經不合適的關係或情緒仍有依戀。給自己時間哀悼與整理，才能迎接更健康的連結。',
+     '抗拒改變學習方式，或停留在舒適圈。選擇一個小小的新作法開始嘗試，慢慢轉型。',
+     '不願放棄過時的做法或崗位，導致停滯。主動求新、學習新技能，轉變來得越早越從容。']},
+{r:'XIV',name:'節制',u:['調和','耐心'],v:['失衡','過度'],
+ up:['水在兩杯之間流轉，不多不少。以耐心調和對立，保持節奏與平衡，細水長流方能抵達遠方。',
+     '以溫和的態度磨合彼此的差異。互相包容、給予與接受取得平衡，感情自然細膩而長久。',
+     '適合穩定安排、各科均衡的學習。循序漸進、勞逸結合，緩慢而持續的節奏最有收穫。',
+     '協調各方需求、調和資源的時節。適度分配精力，耐心合作，能為團隊帶來穩定的成果。'],
+ rv:['步調略失均衡，或某方面用力過度。回到中庸之道，重新調整生活與工作的比例。',
+     '付出與期待失衡，或情緒過度起伏。暫時降低強度，雙方一起尋找舒適的相處節奏。',
+     '偏重某一科或過度熬夜，作息失衡。重新安排時間與休息，讓長期學習得以持續。',
+     '工作量或情緒管理失衡。重新分配任務與界線，避免過度耗損，才能走得長遠。']},
+{r:'XV',name:'惡魔',u:['執念','誘惑'],v:['掙脫束縛','覺醒'],
+ up:['鎖鏈之下，慾望與執念牽動人心。看清束縛究竟來自何處，覺察便是鬆綁的第一步。',
+     '強烈的吸引力中夾雜依賴或占有。誠實檢視這段關係是出於愛還是不安，保持清醒才能自在。',
+     '易被娛樂或拖延所誘。辨認令人分心的習慣，並為它設定界線，奪回自己的專注。',
+     '金錢、地位或壓力可能成為牽絆。留意自己是否被追逐所驅動，分清想要與需要。'],
+ rv:['鎖鏈漸鬆，覺醒悄然萌生。看見束縛之後，有意識地選擇放手，自由便在掙脫之處。',
+     '開始看清不健康的模式，並願意改變。試著建立新的界線，回到平等而自主的關係。',
+     '逐步擺脫拖延與分心的循環。保持這份覺察，以小步驟建立新的習慣，重新掌握節奏。',
+     '開始跳脫過度勞累或受制於人的處境。重新審視自己的需求，勇敢設定界線與新的方向。']},
+{r:'XVI',name:'高塔',u:['突變','真相'],v:['隱憂蓄積','延遲面對'],
+ up:['驟變如雷電劃過，虛假的結構應聲而落。震盪之後，真相浮現，也留下重建更穩固根基的機會。',
+     '關係中的真相或情緒猛然浮上檯面。雖然震盪，卻能讓虛假的部分剝落，為真實的連結打底。',
+     '既有的計畫或觀念被打破。先接受衝擊，再重新整理基礎，更扎實的理解將從殘垣中建立。',
+     '突如其來的變動打亂原有的安排。保持冷靜、處理當務之急，把危機視為重整的契機。'],
+ rv:['變動的暗流在底下蓄勢，或在逃避必須面對的事。主動檢視隱憂，勝過等待它自行崩落。',
+     '對關係裡的問題避而不談，壓力暗暗累積。尋找合適的時機坦誠溝通，減少突如其來的衝擊。',
+     '擔心結果而不敢檢視不足。直視弱點並逐步補強，能避免臨時的崩潰。',
+     '組織或計畫隱藏著風險。提早做壓力測試與備案，將衝擊降到可承受的範圍。']},
+{r:'XVII',name:'星星',u:['希望','療癒'],v:['信心暫弱','迷惘'],
+ up:['夜空清朗，星光指路。經歷風雨之後的療癒與希望，提醒人保持信念、輕聲前行。',
+     '溫柔而真誠的連結，如星光般安靜。對感情保有信任與希望，療癒與新生緩緩發生。',
+     '靈感與信心逐漸回流。抱持對未來的想像，持續累積，遠大的目標如星光般漸漸清晰。',
+     '在低潮之後看見新的方向與願景。堅持理念、保持開放，耐心前行必有回應。'],
+ rv:['星光暫時被雲遮住，信心稍有動搖。不必急著證明什麼，先照顧自己，等雲散去。',
+     '對感情失去信心或感到疲倦。給自己療傷的時間，重新相信美好仍有可能。',
+     '目標遙遠而使人氣餒。把大目標拆成每日可完成的小事，從身邊的小成就找回熱情。',
+     '前景不明而動力下降。回想最初的初衷，與信任的人談談，重新校準方向與期望。']},
+{r:'XVIII',name:'月亮',u:['不安','潛意識'],v:['迷霧散去','釋懷'],
+ up:['月色朦朧，路徑隱於霧中。不安與夢境皆從潛意識浮起，保持覺察，勿被幻影牽著走。',
+     '情緒敏感而多想，真假難辨。多與對方確認真實的想法，別讓猜測與恐懼擴大。',
+     '思緒容易起伏、難以集中。以規律的作息與清楚的筆記穩住心神，不確定之處逐一釐清。',
+     '局勢未明、資訊不全。暫緩重大決定、多方查證，在迷霧散去前謹慎前行。'],
+ rv:['迷霧漸散，真相逐漸清晰。長久的焦慮得以釋放，帶著這份清明，向前邁進。',
+     '心中的疑慮慢慢化解，彼此更能坦誠。保持溝通，將不安化為理解。',
+     '困惑逐漸澄清，思路變得順暢。把握這個清醒的時段，整理學習重點並推進進度。',
+     '模糊的情勢逐漸明朗，不確定性降低。依新的資訊更新計畫，果斷採取行動。']},
+{r:'XIX',name:'太陽',u:['喜悅','成功'],v:['暫時受挫','過度樂觀'],
+ up:['日光普照，萬物明亮。喜悅、活力與坦率的自信在此時綻放，成功與溫暖彼此相伴。',
+     '關係溫暖、開朗而充滿活力。坦率地表達愛與快樂，與對方共享單純的幸福。',
+     '理解與成果同時豐收。保持信心與熱情，將成就與同學分享，好的氛圍更能相互加乘。',
+     '努力獲得肯定，工作氣氛明朗。把握曝光與展現的機會，真誠的自信是最好的名片。'],
+ rv:['陽光暫被雲層遮住，熱情稍減。不必苛責，快樂的泉源仍在，給自己一點時間重新點亮。',
+     '對關係的期待稍有落差，或不夠坦誠。降低不必要的比較，回到簡單而真誠的陪伴。',
+     '成果未如預期，或過於樂觀而忽略細節。檢查盲點，穩穩補強，熱情仍是最好的動力。',
+     '進度略有延遲，或對成果過分樂觀。以務實的評估調整期待，讓光亮持續而不灼人。']},
+{r:'XX',name:'審判',u:['覺醒','召喚'],v:['苛責自己','不願面對'],
+ up:['號角響起，過往被重新衡量。傾聽內心的召喚，原諒與整合之後，便能以嶄新的自己前行。',
+     '重新審視關係，作出清楚的決定。誠實地原諒與面對，讓感情以更成熟的姿態重新開始。',
+     '回顧過去的學習，總結經驗後重新出發。成績或方向的檢討，是為了更清晰的下一步。',
+     '迎來評估、轉職或重新定位的契機。回應內心的召喚，把過往的經驗整合成新的方向。'],
+ rv:['對自己或過去批評過重，不願面對真實的聲音。溫和地檢視過往，允許自己從中學習。',
+     '因舊事而自責或責怪對方，難以釋懷。練習寬恕與放下，讓關係得以向前。',
+     '過度苛責自己，或逃避檢討。以事實代替評判，找出可改進之處，持續邁進。',
+     '遲遲不願面對評估或轉變的時機。主動收集回饋，勇敢作出決定，反而更能掌握主導權。']},
+{r:'XXI',name:'世界',u:['圓滿','完成'],v:['差臨門一腳','尚待收尾'],
+ up:['花環閉合，旅程圓滿。完成與整合的時刻，宜回望一路所得，並為下一段旅程輕輕啟程。',
+     '感情有圓滿與歸屬之感。珍惜彼此一路的相互成就，並一同描繪下一階段的藍圖。',
+     '長期的學習告一段落，成果得以展現。整理心得與作品，慶祝自己的完成，並展望新階段。',
+     '專案達成或角色圓滿。總結經驗與成果，與團隊分享榮耀，並規劃更高的目標。'],
+ rv:['差最後一步，或猶豫著不願收尾。補上遺漏的環節，讓圓滿真正閉合，再邁向下一程。',
+     '關係中仍有未盡之事或未說之話。完成這最後的溝通，方能真正放下或圓滿。',
+     '即將完成之際，動力有所下滑。將最後階段拆成小步驟，穩穩收尾，勿功虧一簣。',
+     '專案尚缺最後環節，或不知如何收束。盤點待辦、逐項完成，並留意交接與總結。']}
+];
+
+/* 三張牌陣的綜合語：依正逆位排列（U 正、R 逆）；再接類別結語 */
+const SUMMARY={
+ UUU:'三牌皆正，星河順流。過去的根基、當下的狀態與前方的方向彼此呼應，宜把握這份連貫的力量。',
+ UUR:'過去與當下皆有支持，而前路尚存一處須留心的環節。及早為它準備，便能平穩過渡。',
+ URU:'當下有一處需要調整，但過去的積累與未來的方向皆具助力。此刻的修整，將成為通往前路的橋。',
+ URR:'過去提供了根基，現在與未來都帶來提醒。宜放慢腳步，檢視現況，讓調整先於前進。',
+ RUU:'往昔或有未解的糾結，所幸當下與未來皆明亮。釋懷過去，便能輕裝走向前方。',
+ RUR:'過去與未來皆須留意，唯有當下是穩定的支點。以此刻的清醒，梳理來路、預備前程。',
+ RRU:'過去與當下皆帶有提醒，未來卻有光。此刻的反思與調整，將引領前行者走向開闊之處。',
+ RRR:'三牌皆逆，是一段需要內省的時節。這並非凶兆，而是邀請人停下腳步，重新整理心緒與方向。'
+};
+const CLOSING={
+ all:'願以平靜的心，帶著牌中的訊息度過今日與往後。',
+ love:'於情感之事，願真誠與耐心長伴左右。',
+ study:'於學業之路，願專注與好奇心為燈。',
+ work:'於事業之途，願清明的判斷與穩健的步伐同行。'
+};
+
+/* ========== 常數與狀態 ========== */
+const CATS=[['all','綜合'],['love','愛情'],['study','學業'],['work','事業']];
+const CATNAME={all:'綜合',love:'愛情',study:'學業',work:'事業'};
+const CATIDX={all:0,love:1,study:2,work:3};
+const POS=[
+  {t:'過去之影',s:'此牌映照走過的路。'},
+  {t:'現在之光',s:'此牌照亮眼前的當下。'},
+  {t:'未來之途',s:'此牌指向前方的光。'}
+];
+const STORE_KEY='starry-tarot:v1:history';
+const MAX_HISTORY=30;
+
+const $=s=>document.querySelector(s);
+const els={
+  slots:$('#slots'),deck:$('#deckArea'),status:$('#status'),reading:$('#reading'),
+  readTitle:$('#readTitle'),readBody:$('#readBody'),summary:$('#summary'),
+  start:$('#startBtn'),sr:$('#sr'),hist:$('#histList'),histNote:$('#histNote'),clear:$('#clearBtn'),
+  modeSeg:$('#modeSeg')
+};
+const state={mode:'daily',cat:'all',phase:'idle',busy:false,deck:[],picks:[],dailyKey:''};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const reduce=()=>!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+const narrow=()=>!!(window.matchMedia&&window.matchMedia('(max-width: 767px)').matches);
+const pad=n=>String(n).padStart(2,'0');
+
+/* ========== 雜湊與抽牌 ========== */
+// FNV-1a 32 位元雜湊（固定演算法，同樣的輸入永遠得到同樣的結果）
+function fnv1a(str){
+  let h=0x811c9dc5;
+  for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0}
+  return h>>>0;
+}
+function todayKey(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function dateLabel(k){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(k);return m?`${m[1]}年${+m[2]}月${+m[3]}日`:k}
+// 每日運勢：完全由「本機日期」決定，牌號與正逆位用不同鹽值各自雜湊，互不相關
+function dailyDraw(k){
+  return {id:fnv1a('starry-tarot|card|'+k)%22, rev:fnv1a('starry-tarot|orient|'+k)%2===1};
+}
+// 三張牌陣：Fisher-Yates 洗牌，每張牌各自 50% 逆位
+function shuffleDeck(){
+  const a=[];for(let i=0;i<22;i++)a.push(i);
+  for(let i=21;i>0;i--){const j=Math.floor(Math.random()*(i+1));const t=a[i];a[i]=a[j];a[j]=t}
+  return a.map(id=>({id:id,rev:Math.random()<0.5}));
+}
+
+/* ========== 畫面建構 ========== */
+function buildCatTabs(){
+  document.querySelectorAll('.cat-tabs').forEach(el=>{
+    el.innerHTML=CATS.map(c=>`<button type="button" role="radio" data-cat="${c[0]}" aria-checked="${c[0]===state.cat}">${c[1]}</button>`).join('');
+  });
+}
+function syncCats(){document.querySelectorAll('.cat-tabs button').forEach(b=>b.setAttribute('aria-checked',String(b.dataset.cat===state.cat)))}
+function syncMode(){els.modeSeg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-checked',String(b.dataset.mode===state.mode)))}
+
+function buildSlots(){
+  const n=state.mode==='daily'?1:3;
+  els.slots.className='slots'+(n===1?' daily':'');
+  let h='';
+  for(let k=0;k<n;k++){h+=`<div class="slot"><div class="label">${n===1?'今日之牌':POS[k].t}</div><div class="slotbox" data-k="${k}"></div></div>`}
+  els.slots.innerHTML=h;
+}
+function buildDeck(){
+  els.deck.className='deckarea';
+  let h='';
+  for(let i=0;i<22;i++){
+    const a=(-55+i*110/21).toFixed(2);
+    h+=`<button type="button" class="dcard" tabindex="-1" style="--i:${i};--a:${a}deg;--d:${i%2?1:-1}" data-i="${i}" data-a="${a}" aria-label="第 ${i+1} 張牌，尚未翻開">${BACK}</button>`;
+  }
+  els.deck.innerHTML=h;
+}
+function cardHTML(p){
+  const c=CARDS[p.id];
+  return `<div class="card-inner"><div class="face back">${BACK}</div>`+
+    `<div class="face front"><span class="roman">${c.r}</span>`+
+    `<div class="icon"><svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[p.id]()}</svg></div>`+
+    `<span class="cname">${c.name}</span>${p.rev?'<span class="rtag">逆位</span>':''}</div></div>`;
+}
+
+function updateStartLabel(){
+  const m={idle:'開始洗牌',shuffling:'洗牌中…',pick:'重新洗牌',done:'再抽一次'};
+  els.start.textContent=m[state.phase]||'開始洗牌';
+}
+function setPhase(p){state.phase=p;updateStartLabel()}
+function setBusy(b){
+  state.busy=b;els.start.disabled=b;
+  els.modeSeg.querySelectorAll('button').forEach(x=>x.disabled=b);
+}
+function idleStatus(){
+  els.status.textContent=state.mode==='daily'?'按下「開始洗牌」，翻開今日之牌。':'按下「開始洗牌」，為過去、現在與未來各抽一張牌。';
+}
+function resetStage(){
+  state.picks=[];state.deck=[];
+  els.reading.hidden=true;els.summary.hidden=true;els.readBody.innerHTML='';
+  buildSlots();buildDeck();
+  setPhase('idle');setBusy(false);idleStatus();
+}
+
+/* ========== 抽牌流程 ========== */
+function availCards(){
+  return Array.prototype.filter.call(els.deck.children,c=>!c.classList.contains('picked')&&(state.mode==='three'||c.dataset.i==='0'));
+}
+async function startShuffle(){
+  if(state.busy)return;
+  resetStage();
+  setBusy(true);setPhase('shuffling');
+  state.dailyKey=todayKey();
+  state.deck=state.mode==='daily'?[dailyDraw(state.dailyKey)]:shuffleDeck();
+  els.status.textContent='洗牌中，星辰緩緩移動……';
+  els.deck.classList.add('shuffling');
+  await sleep(reduce()?300:2500);
+  els.deck.classList.remove('shuffling');
+  const cards=Array.prototype.slice.call(els.deck.children);
+  if(state.mode==='daily'){
+    els.deck.classList.add('single');
+    cards.forEach((c,i)=>{if(i>0)c.setAttribute('aria-hidden','true')});
+    cards[0].setAttribute('aria-label','今日之牌，尚未翻開');
+    els.status.textContent='點擊牌背，翻開今日之牌。';
+  }else{
+    els.deck.classList.add('fan');
+    els.status.textContent='請選擇第 1 張牌（'+POS[0].t+'）。';
+  }
+  await sleep(reduce()?50:1000);
+  els.deck.classList.add('settled');
+  setPhase('pick');setBusy(false);
+  const av=availCards();av.forEach(c=>{c.tabIndex=-1});
+  if(av.length)(state.mode==='daily'?av[0]:av[Math.floor(av.length/2)]).tabIndex=0;
+}
+
+async function pick(i){
+  if(state.phase!=='pick'||state.busy)return;
+  const el=els.deck.children[i];
+  if(!el||el.classList.contains('picked'))return;
+  if(state.mode==='daily'&&i!==0)return;
+  const need=state.mode==='daily'?1:3;
+  const k=state.picks.length;
+  const res=state.deck[state.mode==='daily'?0:i];
+  const wasFocused=document.activeElement===el;
+  setBusy(true);
+  state.picks.push({id:res.id,rev:res.rev});
+  el.classList.add('picked');
+  el.tabIndex=-1;
+  el.setAttribute('aria-label','第 '+(i+1)+' 張牌，已選取');
+  const box=els.slots.querySelector('.slotbox[data-k="'+k+'"]');
+  const cardEl=document.createElement('div');
+  cardEl.className='card3d'+(res.rev?' rev':'');
+  cardEl.innerHTML=cardHTML(res);
+  box.appendChild(cardEl);
+  if(!reduce()){
+    // 牌從牌堆位置飛到牌位
+    const dr=el.getBoundingClientRect(),sr=box.getBoundingClientRect();
+    const dx=dr.left+dr.width/2-(sr.left+sr.width/2);
+    const dy=dr.top+dr.height/2-(sr.top+sr.height/2);
+    const s=el.offsetWidth/sr.width;
+    const a=(state.mode==='daily'||narrow())?0:parseFloat(el.dataset.a);
+    cardEl.style.transition='none';
+    cardEl.style.transform='translate('+dx+'px,'+dy+'px) rotate('+a+'deg) scale('+s+')';
+    void cardEl.offsetWidth;
+    cardEl.style.transition='transform .7s cubic-bezier(.2,.8,.2,1)';
+    cardEl.style.transform='none';
+    await sleep(750);
+  }
+  if(state.mode==='daily')el.style.visibility='hidden';
+  cardEl.classList.add('flipped');
+  await sleep(reduce()?400:950);
+  const c=CARDS[res.id];
+  els.sr.textContent='抽到：'+c.name+'，'+(res.rev?'逆位':'正位');
+  if(state.picks.length>=need){finish();return}
+  els.status.textContent='請選擇第 '+(state.picks.length+1)+' 張牌（'+POS[state.picks.length].t+'）。';
+  setBusy(false);
+  const av=availCards();av.forEach(x=>{x.tabIndex=-1});
+  if(av.length){
+    let nx=av.find(x=>+x.dataset.i>i)||av[av.length-1];
+    nx.tabIndex=0;
+    if(wasFocused)nx.focus();
+  }
+}
+
+async function finish(){
+  setPhase('done');
+  els.status.textContent=state.mode==='daily'?'今日之牌已現，請閱讀牌義。':'三張牌皆已翻開，請閱讀牌義。';
+  saveHistory();renderHistory();
+  els.deck.classList.add('collapsed');
+  await sleep(reduce()?0:450);
+  renderReading();
+  els.reading.hidden=false;
+  setBusy(false);
+  els.slots.scrollIntoView({behavior:reduce()?'auto':'smooth',block:'start'});
+}
+
+/* ========== 解讀 ========== */
+function cardText(c,rev,cat){return (rev?c.rv:c.up)[CATIDX[cat]]}
+function renderReading(){
+  const three=state.mode==='three';
+  els.readTitle.textContent=(three?'三張牌陣':'今日運勢・'+dateLabel(state.dailyKey))+'・'+CATNAME[state.cat];
+  let h='<div class="rgrid'+(three?'':' one')+'">';
+  state.picks.forEach((p,k)=>{
+    const c=CARDS[p.id];
+    h+='<article class="rcard">'+(three?'<p class="pos">'+POS[k].t+'</p>':'')+
+      '<h3>'+c.name+'<span class="ori'+(p.rev?' r':'')+'">'+(p.rev?'逆位':'正位')+'</span></h3>'+
+      '<p class="kw">'+(p.rev?c.v:c.u).join('・')+'</p>'+
+      (three?'<p class="posintro">'+POS[k].s+'</p>':'')+
+      '<p class="txt">'+cardText(c,p.rev,state.cat)+'</p></article>';
+  });
+  h+='</div>';
+  els.readBody.innerHTML=h;
+  if(three){
+    const pat=state.picks.map(p=>p.rev?'R':'U').join('');
+    els.summary.textContent=SUMMARY[pat]+CLOSING[state.cat];
+    els.summary.hidden=false;
+  }else{els.summary.hidden=true}
+}
+
+/* ========== 抽牌紀錄（localStorage） ========== */
+let history=[];let storageOK=true;
+function validEntry(h){
+  return h&&(h.mode==='daily'||h.mode==='three')&&CATNAME[h.cat]&&Array.isArray(h.cards)&&
+    h.cards.length===(h.mode==='daily'?1:3)&&Number.isFinite(h.t)&&
+    h.cards.every(c=>c&&Number.isInteger(c.id)&&c.id>=0&&c.id<22);
+}
+function loadHistory(){
+  try{
+    localStorage.setItem(STORE_KEY+':probe','1');localStorage.removeItem(STORE_KEY+':probe');
+    const raw=localStorage.getItem(STORE_KEY);
+    if(raw){
+      const a=JSON.parse(raw);
+      if(Array.isArray(a))history=a.filter(validEntry).slice(0,MAX_HISTORY).map(h=>({
+        t:h.t,mode:h.mode,cat:h.cat,d:(typeof h.d==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(h.d))?h.d:'',
+        cards:h.cards.map(c=>({id:c.id,rev:!!c.rev}))
+      }));
+    }
+  }catch(e){storageOK=false}
+}
+function persist(){try{localStorage.setItem(STORE_KEY,JSON.stringify(history))}catch(e){storageOK=false}}
+function saveHistory(){
+  const entry={t:Date.now(),mode:state.mode,cat:state.cat,d:state.mode==='daily'?state.dailyKey:'',cards:state.picks.map(p=>({id:p.id,rev:p.rev}))};
+  // 每日運勢：同一天只保留一筆（重抽時覆蓋）
+  if(entry.mode==='daily')history=history.filter(h=>!(h.mode==='daily'&&h.d===entry.d));
+  history.unshift(entry);
+  history=history.slice(0,MAX_HISTORY);
+  persist();
+}
+function fmtTime(t){const d=new Date(t);return pad(d.getMonth()+1)+'/'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())}
+function renderHistory(){
+  if(!history.length){
+    els.hist.innerHTML='<li class="muted">尚無紀錄。抽牌後會顯示在這裡。</li>';
+  }else{
+    els.hist.innerHTML=history.map(h=>{
+      const names=h.cards.map(c=>CARDS[c.id].name+'（'+(c.rev?'逆':'正')+'）').join('／');
+      const detail=h.cards.map((c,k)=>{
+        const cd=CARDS[c.id];
+        return '<p><strong>'+(h.mode==='three'?POS[k].t+'：':'')+cd.name+'・'+(c.rev?'逆位':'正位')+'</strong><br>'+
+          (c.rev?cd.v:cd.u).join('・')+'<br>'+cardText(cd,c.rev,h.cat)+'</p>';
+      }).join('');
+      return '<li><details><summary><span class="ht">'+fmtTime(h.t)+'・'+(h.mode==='daily'?'每日運勢':'三張牌陣')+'・'+CATNAME[h.cat]+'</span>'+names+'</summary><div class="hdetail">'+detail+'</div></details></li>';
+    }).join('');
+  }
+  els.histNote.textContent=storageOK?'最近 30 筆，保存在這個瀏覽器中。':'此瀏覽器無法保存紀錄，關閉頁面後會消失。';
+  els.clear.disabled=!history.length;
+}
+let clearArmed=false,clearTimer=null;
+function disarmClear(){clearArmed=false;clearTimeout(clearTimer);els.clear.textContent='清除紀錄'}
+els.clear.addEventListener('click',()=>{
+  if(!clearArmed){clearArmed=true;els.clear.textContent='確定清除？再按一次';clearTimer=setTimeout(disarmClear,3000);return}
+  history=[];persist();disarmClear();renderHistory();
+});
+
+/* ========== 事件 ========== */
+els.start.addEventListener('click',()=>{
+  if(state.phase==='done'){resetStage();window.scrollTo({top:0,behavior:reduce()?'auto':'smooth'});return}
+  startShuffle();
+});
+els.modeSeg.addEventListener('click',e=>{
+  const b=e.target.closest('button');
+  if(!b||state.busy||b.dataset.mode===state.mode)return;
+  state.mode=b.dataset.mode;syncMode();resetStage();
+});
+document.addEventListener('click',e=>{
+  const b=e.target.closest('.cat-tabs button');
+  if(!b)return;
+  state.cat=b.dataset.cat;syncCats();
+  if(state.phase==='done')renderReading();
+});
+els.deck.addEventListener('click',e=>{
+  const b=e.target.closest('.dcard');
+  if(b)pick(+b.dataset.i);
+});
+els.deck.addEventListener('keydown',e=>{
+  if(state.phase!=='pick')return;
+  const av=availCards();if(!av.length)return;
+  const cur=av.indexOf(document.activeElement);
+  let ni=-1;
+  if(e.key==='ArrowRight'||e.key==='ArrowDown')ni=cur<0?0:Math.min(av.length-1,cur+1);
+  else if(e.key==='ArrowLeft'||e.key==='ArrowUp')ni=cur<0?0:Math.max(0,cur-1);
+  else if(e.key==='Home')ni=0;
+  else if(e.key==='End')ni=av.length-1;
+  if(ni>=0){e.preventDefault();av.forEach(c=>{c.tabIndex=-1});av[ni].tabIndex=0;av[ni].focus()}
+});
+
+/* ========== 星空背景與初始化 ========== */
+(function stars(){
+  const box=$('#stars');let h='';
+  for(let i=0;i<90;i++){
+    const s=(Math.random()*1.8+0.8).toFixed(1);
+    h+=`<div class="star" style="left:${(Math.random()*100).toFixed(1)}%;top:${(Math.random()*100).toFixed(1)}%;width:${s}px;height:${s}px;--dur:${(3+Math.random()*4).toFixed(1)}s;--del:${(Math.random()*5).toFixed(1)}s"></div>`;
+  }
+  box.innerHTML=h;
+})();
+
+loadHistory();
+renderHistory();
+buildCatTabs();
+resetStage();
+})();
+</script>
+</body>
+</html>
